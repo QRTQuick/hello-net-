@@ -1,6 +1,6 @@
-// Use Express.js backend endpoints
+// Frontend-only mode for Vercel deployment
 const BACKEND_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://your-app-name.vercel.app' 
+  ? null // No backend in production, use direct iframe
   : 'http://localhost:8000';
 
 export interface ProxyResponse {
@@ -52,9 +52,16 @@ export interface SearchSuggestions {
 
 export const proxyService = {
   /**
-   * Proxy a website through the Express.js backend
+   * Proxy a website through the Express.js backend (development only)
    */
   async proxyWebsite(url: string): Promise<ProxyResponse> {
+    if (!BACKEND_URL) {
+      return {
+        success: false,
+        error: 'Proxy service not available in production. Use direct iframe or run local backend.'
+      };
+    }
+
     try {
       const response = await fetch(`${BACKEND_URL}/api/proxy?url=${encodeURIComponent(url)}`);
       
@@ -77,9 +84,24 @@ export const proxyService = {
   },
 
   /**
-   * Extract clean text content from a website
+   * Extract clean text content from a website (development only)
    */
   async extractContent(url: string): Promise<ExtractedContent | null> {
+    if (!BACKEND_URL) {
+      // Fallback for production - return basic info
+      return {
+        url,
+        title: 'Content Extraction Unavailable',
+        content: 'Content extraction requires the Express.js backend. Run locally for full features.',
+        description: '',
+        keywords: '',
+        author: '',
+        length: 0,
+        wordCount: 0,
+        status: 'backend-unavailable'
+      };
+    }
+
     try {
       const response = await fetch(`${BACKEND_URL}/api/extract?url=${encodeURIComponent(url)}`);
       
@@ -96,9 +118,13 @@ export const proxyService = {
   },
 
   /**
-   * Get website metadata (title, description, images, etc.)
+   * Get website metadata (development only)
    */
   async getMetadata(url: string): Promise<WebsiteMetadata | null> {
+    if (!BACKEND_URL) {
+      return null;
+    }
+
     try {
       const response = await fetch(`${BACKEND_URL}/api/metadata?url=${encodeURIComponent(url)}`);
       
@@ -115,9 +141,26 @@ export const proxyService = {
   },
 
   /**
-   * Get search suggestions
+   * Get search suggestions (fallback for production)
    */
   async getSearchSuggestions(query: string): Promise<SearchSuggestions | null> {
+    if (!BACKEND_URL) {
+      // Simple fallback suggestions for production
+      const suggestions = [
+        `${query} site:wikipedia.org`,
+        `${query} tutorial`,
+        `${query} guide`,
+        `how to ${query}`,
+        `${query} examples`
+      ];
+      
+      return {
+        query,
+        suggestions,
+        timestamp: new Date().toISOString()
+      };
+    }
+
     try {
       const response = await fetch(`${BACKEND_URL}/api/search?q=${encodeURIComponent(query)}`);
       
@@ -137,6 +180,10 @@ export const proxyService = {
    * Check if backend is available
    */
   async checkHealth(): Promise<boolean> {
+    if (!BACKEND_URL) {
+      return false;
+    }
+
     try {
       const response = await fetch(`${BACKEND_URL}/health`);
       return response.ok;
@@ -149,6 +196,13 @@ export const proxyService = {
    * Get detailed backend status
    */
   async getStatus(): Promise<{ available: boolean; message: string; details?: any }> {
+    if (!BACKEND_URL) {
+      return {
+        available: false,
+        message: 'Running in frontend-only mode. Start local Express.js server for full features.'
+      };
+    }
+
     try {
       const response = await fetch(`${BACKEND_URL}/health`);
       
@@ -168,7 +222,7 @@ export const proxyService = {
     } catch (error) {
       return {
         available: false,
-        message: 'Backend is not available. Please start the Express.js server.'
+        message: 'Backend is not available. Start the Express.js server for full features.'
       };
     }
   }
