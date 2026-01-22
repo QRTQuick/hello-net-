@@ -1,0 +1,7 @@
+{
+  "name": "Hello Net",
+  "description": "A futuristic AI-powered mobile browser interface with built-in search grounding, summarization, and smart navigation.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
