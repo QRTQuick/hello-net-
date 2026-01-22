@@ -2,7 +2,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ChatMessage, SearchResult } from "../types";
 
-const API_KEY = process.env.API_KEY || "";
+const API_KEY = process.env.GEMINI_API_KEY || "";
 
 export const searchWithGemini = async (query: string): Promise<{ text: string; sources: SearchResult[] }> => {
   const ai = new GoogleGenAI({ apiKey: API_KEY });
@@ -29,7 +29,7 @@ export const searchWithGemini = async (query: string): Promise<{ text: string; s
     return { text, sources };
   } catch (error) {
     console.error("Gemini Search Error:", error);
-    return { text: "Error connecting to the intelligence network.", sources: [] };
+    throw error;
   }
 };
 

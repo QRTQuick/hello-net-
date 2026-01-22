@@ -1,12 +1,19 @@
 {
   "name": "hello-net",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "AI-powered mobile browser with Express.js backend",
+  "keywords": ["browser", "ai", "mobile", "proxy", "react", "express"],
+  "author": "Hello Net Team",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "python start-express.py",
+    "backend": "cd server && npm run dev",
+    "frontend": "npm run dev"
   },
   "dependencies": {
     "react": "^19.2.3",
@@ -19,5 +26,17 @@
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
-  }
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/hello-net.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/hello-net/issues"
+  },
+  "homepage": "https://github.com/yourusername/hello-net#readme"
 }
