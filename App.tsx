@@ -36,7 +36,16 @@ const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<'web' | 'ai'>('web'); // New state for view mode
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
-  const [historyIndex, setHistoryIndex] = useState(0);
+  const [iframeError, setIframeError] = useState(false);
+  const [blockedSites] = useState(new Set([
+    'google.com', 'youtube.com', 'facebook.com', 'twitter.com', 'x.com', 
+    'instagram.com', 'linkedin.com', 'netflix.com', 'amazon.com'
+  ]));
+
+  const isBlockedSite = (url: string) => {
+    const domain = url.replace('https://', '').replace('http://', '').split('/')[0];
+    return Array.from(blockedSites).some(blocked => domain.includes(blocked));
+  };
 
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
   const inputRef = useRef<HTMLInputElement>(null);
@@ -119,15 +128,23 @@ const App: React.FC = () => {
     const isUrl = containsDot || input.startsWith('http');
     
     if (!isUrl) {
-      // It's a search query
-      targetUrl = `https://www.google.com/search?q=${encodeURIComponent(input)}`;
+      // It's a search query - use DuckDuckGo which allows iframe embedding
+      targetUrl = `https://duckduckgo.com/?q=${encodeURIComponent(input)}`;
       setViewMode('web');
     } else {
       // It's a URL
       if (!input.startsWith('http')) {
         targetUrl = `https://${input}`;
       }
-      setViewMode('web');
+      
+      // Check if it's a blocked site and suggest AI mode
+      if (isBlockedSite(targetUrl)) {
+        setViewMode('ai');
+        setIframeError(true);
+      } else {
+        setViewMode('web');
+        setIframeError(false);
+      }
     }
 
     // Update tab immediately
@@ -147,10 +164,18 @@ const App: React.FC = () => {
       updateHistory(targetUrl);
     }
 
-    // Simulate loading time
-    setTimeout(() => {
-      setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, isLoading: false } : t));
-    }, 1500);
+    // If it's a blocked site, automatically switch to AI mode
+    if (isBlockedSite(targetUrl)) {
+      setTimeout(async () => {
+        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, isLoading: false } : t));
+        await switchToAIMode();
+      }, 500);
+    } else {
+      // Simulate loading time for non-blocked sites
+      setTimeout(() => {
+        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, isLoading: false } : t));
+      }, 1500);
+    }
   };
 
   const switchToAIMode = async () => {
@@ -178,6 +203,8 @@ const App: React.FC = () => {
     setIsReadingMode(false);
     setInputValue('');
     setIsTabSwitcherOpen(false);
+    setIframeError(false);
+    setViewMode('web');
   };
 
   const closeTab = (id: string, e: React.MouseEvent) => {
@@ -204,6 +231,7 @@ const App: React.FC = () => {
     setHistoryIndex(0);
     setCanGoBack(false);
     setCanGoForward(false);
+    setIframeError(false);
   };
 
   // Update navigation state when active tab changes
@@ -274,26 +302,44 @@ const App: React.FC = () => {
             {/* Speed Dial / Favorites */}
             <div className="grid grid-cols-4 gap-y-8 gap-x-4 px-6 mb-12">
               {[
-                { name: 'Google', icon: 'G', color: 'bg-white text-black', url: 'google.com' },
-                { name: 'YouTube', icon: 'Y', color: 'bg-red-600 text-white', url: 'youtube.com' },
-                { name: 'Twitter', icon: '𝕏', color: 'bg-black border border-white/20', url: 'x.com' },
-                { name: 'OpenAI', icon: 'A', color: 'bg-emerald-600', url: 'openai.com' },
-                { name: 'Amazon', icon: 'a', color: 'bg-orange-500', url: 'amazon.com' },
-                { name: 'Reddit', icon: 'R', color: 'bg-orange-600', url: 'reddit.com' },
-                { name: 'Netflix', icon: 'N', color: 'bg-red-700', url: 'netflix.com' },
-                { name: 'Github', icon: 'Git', color: 'bg-slate-800', url: 'github.com' },
+                { name: 'DuckDuckGo', icon: 'D', color: 'bg-orange-600 text-white', url: 'duckduckgo.com' },
+                { name: 'Wikipedia', icon: 'W', color: 'bg-slate-700 text-white', url: 'wikipedia.org' },
+                { name: 'Stack Overflow', icon: 'SO', color: 'bg-orange-500 text-white', url: 'stackoverflow.com' },
+                { name: 'MDN', icon: 'M', color: 'bg-blue-600 text-white', url: 'developer.mozilla.org' },
+                { name: 'Google*', icon: 'G', color: 'bg-white text-black', url: 'google.com' },
+                { name: 'GitHub*', icon: 'Git', color: 'bg-slate-800 text-white', url: 'github.com' },
+                { name: 'YouTube*', icon: 'Y', color: 'bg-red-600 text-white', url: 'youtube.com' },
+                { name: 'Reddit*', icon: 'R', color: 'bg-orange-600 text-white', url: 'reddit.com' },
               ].map(site => (
                 <button 
                   key={site.name}
                   onClick={() => navigateTo(site.url)}
                   className="flex flex-col items-center gap-2 group"
                 >
-                  <div className={`w-14 h-14 ${site.color} rounded-2xl flex items-center justify-center text-xl font-bold shadow-lg group-active:scale-90 transition-transform`}>
+                  <div className={`w-14 h-14 ${site.color} rounded-2xl flex items-center justify-center text-xl font-bold shadow-lg group-active:scale-90 transition-transform relative`}>
                     {site.icon}
+                    {site.name.includes('*') && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-500 rounded-full flex items-center justify-center">
+                        <span className="text-[8px] text-black font-bold">!</span>
+                      </div>
+                    )}
                   </div>
-                  <span className="text-[11px] font-medium text-slate-400">{site.name}</span>
+                  <span className="text-[11px] font-medium text-slate-400">{site.name.replace('*', '')}</span>
                 </button>
               ))}
+            </div>
+
+            {/* Info about blocked sites */}
+            <div className="px-6 mb-8">
+              <div className="bg-yellow-600/10 border border-yellow-600/20 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <ShieldCheck className="w-4 h-4 text-yellow-500" />
+                  <span className="text-sm font-medium text-yellow-400">Sites marked with ! use AI Reader</span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Some sites block embedding for security. Hello Net automatically switches to AI Reader mode for these sites.
+                </p>
+              </div>
             </div>
 
             {/* AI Discovery Feed */}
@@ -369,45 +415,70 @@ const App: React.FC = () => {
             {/* Content Area */}
             {viewMode === 'web' ? (
               <div className="flex-1 relative">
-                {activeTab.isLoading && (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
-                    <div className="flex flex-col items-center">
-                      <div className="w-8 h-8 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-3"></div>
-                      <p className="text-slate-400 text-sm">Loading {activeTab.url.replace('https://', '').replace('http://', '').split('/')[0]}...</p>
+                {iframeError || isBlockedSite(activeTab.url) ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+                    <div className="w-16 h-16 bg-yellow-600/20 rounded-full flex items-center justify-center mb-6">
+                      <ShieldCheck className="w-8 h-8 text-yellow-500" />
+                    </div>
+                    <h3 className="text-xl font-bold mb-4">Site Blocks Embedding</h3>
+                    <p className="text-slate-400 mb-6 max-w-md">
+                      {activeTab.url.replace('https://', '').replace('http://', '').split('/')[0]} prevents embedding for security. 
+                      Try AI Reader mode or open in a new tab.
+                    </p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={switchToAIMode}
+                        className="px-6 py-3 bg-indigo-600 rounded-xl font-medium flex items-center gap-2 hover:bg-indigo-700 transition-colors"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        Use AI Reader
+                      </button>
+                      <button
+                        onClick={() => window.open(activeTab.url, '_blank')}
+                        className="px-6 py-3 bg-white/10 rounded-xl font-medium flex items-center gap-2 hover:bg-white/20 transition-colors"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        Open in New Tab
+                      </button>
                     </div>
                   </div>
+                ) : (
+                  <>
+                    {activeTab.isLoading && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+                        <div className="flex flex-col items-center">
+                          <div className="w-8 h-8 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-3"></div>
+                          <p className="text-slate-400 text-sm">Loading {activeTab.url.replace('https://', '').replace('http://', '').split('/')[0]}...</p>
+                        </div>
+                      </div>
+                    )}
+                    <iframe
+                      ref={iframeRef}
+                      src={activeTab.url}
+                      className="w-full h-full border-0"
+                      sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
+                      allow="geolocation; microphone; camera; midi; encrypted-media; fullscreen"
+                      loading="lazy"
+                      onLoad={() => {
+                        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, isLoading: false } : t));
+                        setIframeError(false);
+                        // Try to get the page title from iframe (if same-origin)
+                        try {
+                          const iframeDoc = iframeRef.current?.contentDocument;
+                          if (iframeDoc?.title) {
+                            setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, title: iframeDoc.title } : t));
+                          }
+                        } catch (e) {
+                          // Cross-origin, can't access title
+                        }
+                      }}
+                      onError={() => {
+                        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, isLoading: false } : t));
+                        setIframeError(true);
+                      }}
+                    />
+                  </>
                 )}
-                <iframe
-                  ref={iframeRef}
-                  src={activeTab.url}
-                  className="w-full h-full border-0"
-                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
-                  allow="geolocation; microphone; camera; midi; encrypted-media; fullscreen"
-                  loading="lazy"
-                  onLoad={() => {
-                    setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, isLoading: false } : t));
-                    // Try to get the page title from iframe (if same-origin)
-                    try {
-                      const iframeDoc = iframeRef.current?.contentDocument;
-                      if (iframeDoc?.title) {
-                        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, title: iframeDoc.title } : t));
-                      }
-                    } catch (e) {
-                      // Cross-origin, can't access title
-                    }
-                  }}
-                  onError={() => {
-                    setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, isLoading: false } : t));
-                  }}
-                />
-                
-                {/* Fallback message for blocked iframes */}
-                <div className="absolute bottom-4 left-4 right-4 bg-yellow-600/10 border border-yellow-600/20 rounded-lg p-3 text-xs text-yellow-400 hidden" id="iframe-blocked">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Some sites block embedding. Try opening in a new tab or use AI Reader mode.</span>
-                  </div>
-                </div>
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto">
